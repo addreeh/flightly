@@ -8,17 +8,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { FlightDetailsModal } from '@/components/flight-details-modal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select'
 import mockAnnual from '@/data/annual-mock.json'
 import { MapPinIcon } from '@/components/ui/map-pin'
 import { ClockIcon } from '@/components/ui/clock'
@@ -124,18 +118,27 @@ export default function AnnualPage() {
     return label.charAt(0).toUpperCase() + label.slice(1)
   }
 
+  const formatShortMonth = (monthKey: string) => {
+    const [yearStr, monthStr] = monthKey.split('-')
+    const year = Number(yearStr)
+    const month = Number(monthStr)
+    const d = new Date(year, month - 1, 1)
+    const label = d.toLocaleDateString('es-ES', {
+      month: 'short',
+    })
+    return label.charAt(0).toUpperCase() + label.slice(1)
+  }
+
   const formatDateRange = (from: string, to: string) => {
     const fromDate = new Date(from)
     const toDate = new Date(to)
     const fromStr = fromDate.toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
     })
     const toStr = toDate.toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
     })
     return `${fromStr} - ${toStr}`
   }
@@ -155,17 +158,17 @@ export default function AnnualPage() {
     const parts: string[] = []
 
     if (outDep && outArr) {
-      parts.push(`Ida ${outDep}-${outArr}`)
+      parts.push(`${outDep}-${outArr}`)
     }
     if (inDep && inArr) {
-      parts.push(`Vuelta ${inDep}-${inArr}`)
+      parts.push(`${inDep}-${inArr}`)
     }
 
     if (parts.length === 0) {
       return 'Horario por confirmar'
     }
 
-    return parts.join(' | ')
+    return parts.join(' / ')
   }
 
   const selectedOrigins = React.useMemo(() => {
@@ -262,16 +265,18 @@ export default function AnnualPage() {
     return groups
   }, [data])
 
-  // Filter states - Top section
-  const [topDestFilter, setTopDestFilter] = React.useState<string>('ALL')
-  const [topOriginFilter, setTopOriginFilter] = React.useState<string>('ALL')
-  const [topSortField, setTopSortField] = React.useState<'price' | 'date'>('price')
+  // Multi-select filter states - Top section (Ranking)
+  const [topDestFilters, setTopDestFilters] = React.useState<string[]>([])
+  const [topOriginFilters, setTopOriginFilters] = React.useState<string[]>([])
+  const [topSortByPrice, setTopSortByPrice] = React.useState(true)
+  const [topSortByDate, setTopSortByDate] = React.useState(false)
   const [topSortDirection, setTopSortDirection] = React.useState<'asc' | 'desc'>('asc')
   
-  // Filter states - Group section
-  const [groupDestFilter, setGroupDestFilter] = React.useState<string>('ALL')
-  const [monthFilter, setMonthFilter] = React.useState<string>('ALL')
-  const [groupSortField, setGroupSortField] = React.useState<'price' | 'date'>('price')
+  // Multi-select filter states - Group section (By Month)
+  const [groupDestFilters, setGroupDestFilters] = React.useState<string[]>([])
+  const [monthFilters, setMonthFilters] = React.useState<string[]>([])
+  const [groupSortByPrice, setGroupSortByPrice] = React.useState(true)
+  const [groupSortByDate, setGroupSortByDate] = React.useState(false)
   const [groupSortDirection, setGroupSortDirection] = React.useState<'asc' | 'desc'>('asc')
 
   const monthOptions = React.useMemo(() => {
@@ -328,13 +333,13 @@ export default function AnnualPage() {
     }
   }
 
-  const formatAirportWithLabel = (code: string, label?: string) => {
+  const formatAirportWithLabel = React.useCallback((code: string, label?: string) => {
     const city = label && label !== code ? label : CITY_FROM_CODE[code]
     if (city) {
       return `${city} (${code})`
     }
     return code
-  }
+  }, [CITY_FROM_CODE])
 
   const handleSelectEntry = (entry: AnnualEntry) => {
     const flight = mapAnnualEntryToFlight(entry)
@@ -343,8 +348,8 @@ export default function AnnualPage() {
     setDetailsOpen(true)
   }
 
-  // Derived filter options for selects
-  const destOptions = React.useMemo(() => {
+  // Derived filter options for multi-selects
+  const destOptions: MultiSelectOption[] = React.useMemo(() => {
     if (!data?.topGlobal) return []
     const seen = new Set<string>()
     return data.topGlobal
@@ -354,12 +359,12 @@ export default function AnnualPage() {
         return true
       })
       .map((e) => ({
-        code: e.destination_code,
+        value: e.destination_code,
         label: formatAirportWithLabel(e.destination_code, e.destination_label),
       }))
   }, [data, formatAirportWithLabel])
 
-  const originOptions = React.useMemo(() => {
+  const originOptions: MultiSelectOption[] = React.useMemo(() => {
     if (!data?.topGlobal) return []
     const seen = new Set<string>()
     return data.topGlobal
@@ -369,17 +374,52 @@ export default function AnnualPage() {
         return true
       })
       .map((e) => ({
-        code: e.origin,
+        value: e.origin,
         label: formatAirportWithLabel(e.origin),
       }))
   }, [data, formatAirportWithLabel])
 
-  const groupDestOptions = React.useMemo(() => {
+  const groupDestOptions: MultiSelectOption[] = React.useMemo(() => {
     return Object.entries(groupedBestPerDestAndMonth).map(([code, group]) => ({
-      code,
+      value: code,
       label: formatAirportWithLabel(code, group.label),
     }))
   }, [groupedBestPerDestAndMonth, formatAirportWithLabel])
+
+  const monthSelectOptions: MultiSelectOption[] = React.useMemo(() => {
+    return monthOptions.map((mk) => ({
+      value: mk,
+      label: formatMonthLabel(mk),
+    }))
+  }, [monthOptions])
+
+  // Sorting function that can combine price and date
+  const sortEntries = React.useCallback((
+    entries: AnnualEntry[],
+    byPrice: boolean,
+    byDate: boolean,
+    direction: 'asc' | 'desc'
+  ) => {
+    return [...entries].sort((a, b) => {
+      const dir = direction === 'asc' ? 1 : -1
+      
+      if (byPrice && byDate) {
+        // Primary: price, Secondary: date
+        const priceDiff = (a.total_price - b.total_price) * dir
+        if (priceDiff !== 0) return priceDiff
+        const aDate = new Date(a.depart_date).getTime()
+        const bDate = new Date(b.depart_date).getTime()
+        return (aDate - bDate) * dir
+      } else if (byPrice) {
+        return (a.total_price - b.total_price) * dir
+      } else if (byDate) {
+        const aDate = new Date(a.depart_date).getTime()
+        const bDate = new Date(b.depart_date).getTime()
+        return (aDate - bDate) * dir
+      }
+      return 0
+    })
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
@@ -569,37 +609,39 @@ export default function AnnualPage() {
                         </CardHeader>
                         <CardContent className="relative pb-4">
                           <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-2 text-[11px] text-muted-foreground">
-                              <Badge variant="secondary" className="gap-1 bg-primary/5 text-primary text-[10px]">
-                                <CalendarDaysIcon className="text-primary" size={10} />
+                            <div className="space-y-2">
+                              <Badge variant="secondary" className="gap-1.5 bg-primary/10 text-primary font-semibold">
+                                <CalendarDaysIcon className="text-primary" size={12} />
                                 {formatDateRange(bestPerDestination[0].depart_date, bestPerDestination[0].return_date)}
                               </Badge>
-                              <div className="flex items-center gap-2">
-                                <MapPinIcon className="text-primary shrink-0" size={12} />
-                                <span>
-                                  {formatAirportWithLabel(bestPerDestination[0].origin)} {'>'}{' '}
-                                  {formatAirportWithLabel(
-                                    bestPerDestination[0].destination_code,
-                                    bestPerDestination[0].destination_label,
-                                  )}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <ClockIcon className="text-muted-foreground shrink-0" size={10} />
-                                <span>{formatTimeRange(bestPerDestination[0])}</span>
-                              </div>
-                              <div className="flex items-center gap-2 truncate">
-                                <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
-                                  A
-                                </span>
-                                <span className="truncate">
-                                  {bestPerDestination[0].outbound.airline} / {bestPerDestination[0].inbound.airline}
-                                </span>
+                              <div className="space-y-1.5 text-[11px] text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <MapPinIcon className="text-primary shrink-0" size={12} />
+                                  <span>
+                                    {formatAirportWithLabel(bestPerDestination[0].origin)} {'>'}{' '}
+                                    {formatAirportWithLabel(
+                                      bestPerDestination[0].destination_code,
+                                      bestPerDestination[0].destination_label,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <ClockIcon className="text-muted-foreground shrink-0" size={10} />
+                                  <span>{formatTimeRange(bestPerDestination[0])}</span>
+                                </div>
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
+                                    A
+                                  </span>
+                                  <span className="truncate">
+                                    {bestPerDestination[0].outbound.airline} / {bestPerDestination[0].inbound.airline}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                             <div className="text-right">
                               <span className="block text-[11px] text-muted-foreground">desde</span>
-                              <span className="text-lg font-semibold text-foreground">
+                              <span className="text-2xl font-bold text-primary">
                                 {formatMoney(bestPerDestination[0].total_price, bestPerDestination[0].currency)}
                               </span>
                             </div>
@@ -632,7 +674,7 @@ export default function AnnualPage() {
                                   </Badge>
                                 </div>
                               </div>
-                              <span className="text-sm font-semibold">
+                              <span className="text-base font-bold text-primary">
                                 {formatMoney(entry.total_price, entry.currency)}
                               </span>
                             </div>
@@ -641,7 +683,7 @@ export default function AnnualPage() {
                             <div className="space-y-1.5 text-[11px] text-muted-foreground">
                               <div className="flex items-center gap-1.5">
                                 <CalendarDaysIcon className="text-primary" size={10} />
-                                <span className="font-medium text-foreground">
+                                <span className="font-semibold text-foreground">
                                   {formatDateRange(entry.depart_date, entry.return_date)}
                                 </span>
                               </div>
@@ -666,7 +708,7 @@ export default function AnnualPage() {
               </Card>
             </TabsContent>
 
-            {/* Tab 2: By Month */}
+            {/* Tab 2: By Month - Improved layout */}
             <TabsContent value="by-month" className="space-y-4">
               <Card>
                 <CardHeader className="pb-3">
@@ -685,40 +727,26 @@ export default function AnnualPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Filters using Select and ToggleGroup */}
+                  {/* Multi-select filters */}
                   {Object.keys(groupedBestPerDestAndMonth).length > 0 && (
                     <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-border">
-                      <Select value={groupDestFilter} onValueChange={setGroupDestFilter}>
-                        <SelectTrigger className="w-[180px] h-9 text-xs">
-                          <MapPin className="size-3.5 mr-1.5 text-muted-foreground" />
-                          <SelectValue placeholder="Destino" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">Todos los destinos</SelectItem>
-                          {groupDestOptions.map((opt) => (
-                            <SelectItem key={opt.code} value={opt.code}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <MultiSelect
+                        options={groupDestOptions}
+                        selected={groupDestFilters}
+                        onChange={setGroupDestFilters}
+                        placeholder="Destinos"
+                        icon={<MapPin className="size-3.5 text-muted-foreground" />}
+                        className="w-[200px]"
+                      />
 
-                      {monthOptions.length > 0 && (
-                        <Select value={monthFilter} onValueChange={setMonthFilter}>
-                          <SelectTrigger className="w-[160px] h-9 text-xs">
-                            <CalendarDays className="size-3.5 mr-1.5 text-muted-foreground" />
-                            <SelectValue placeholder="Mes" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ALL">Todos los meses</SelectItem>
-                            {monthOptions.map((mk) => (
-                              <SelectItem key={mk} value={mk}>
-                                {formatMonthLabel(mk)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <MultiSelect
+                        options={monthSelectOptions}
+                        selected={monthFilters}
+                        onChange={setMonthFilters}
+                        placeholder="Meses"
+                        icon={<CalendarDays className="size-3.5 text-muted-foreground" />}
+                        className="w-[200px]"
+                      />
 
                       <Separator orientation="vertical" className="h-6 hidden sm:block" />
 
@@ -727,9 +755,15 @@ export default function AnnualPage() {
                           Ordenar
                         </span>
                         <ToggleGroup
-                          type="single"
-                          value={groupSortField}
-                          onValueChange={(v) => v && setGroupSortField(v as 'price' | 'date')}
+                          type="multiple"
+                          value={[
+                            ...(groupSortByPrice ? ['price'] : []),
+                            ...(groupSortByDate ? ['date'] : []),
+                          ]}
+                          onValueChange={(values) => {
+                            setGroupSortByPrice(values.includes('price'))
+                            setGroupSortByDate(values.includes('date'))
+                          }}
                           className="h-8"
                         >
                           <ToggleGroupItem value="price" className="h-7 px-2.5 text-xs">
@@ -757,75 +791,104 @@ export default function AnnualPage() {
                     </div>
                   )}
 
-                  {/* Monthly grid */}
+                  {/* Improved Monthly grid - no overlapping */}
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {Object.values(groupedBestPerDestAndMonth)
-                      .filter((group) => groupDestFilter === 'ALL' || group.code === groupDestFilter)
-                      .map((group) => (
-                        <Card key={group.code} className="bg-background/40">
-                          <CardHeader className="pb-2 pt-3 px-3">
-                            <CardTitle className="text-sm font-semibold text-foreground">
-                              {formatAirportWithLabel(group.code, group.label)}
-                            </CardTitle>
-                            <CardDescription className="text-[11px]">
-                              {group.items.filter(({ monthKey }) => monthFilter === 'ALL' || monthKey === monthFilter).length} meses disponibles
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="px-3 pb-3">
-                            <ScrollArea className="max-h-60 pr-2">
-                              <div className="space-y-2">
-                                {group.items
-                                  .filter(({ monthKey }) => monthFilter === 'ALL' || monthKey === monthFilter)
-                                  .slice()
-                                  .sort((a, b) => {
-                                    const direction = groupSortDirection === 'asc' ? 1 : -1
-                                    if (groupSortField === 'price') {
-                                      return (a.entry.total_price - b.entry.total_price) * direction
-                                    }
-                                    const aDate = new Date(a.entry.depart_date).getTime()
-                                    const bDate = new Date(b.entry.depart_date).getTime()
-                                    return (aDate - bDate) * direction
-                                  })
-                                  .map(({ monthKey, entry }) => (
-                                    <button
-                                      key={`${group.code}-${monthKey}-${entry.depart_date}-${entry.origin}`}
-                                      type="button"
-                                      onClick={() => handleSelectEntry(entry)}
-                                      className="w-full rounded-lg border border-border bg-card/60 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-accent/50"
-                                    >
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div className="flex flex-col gap-0.5 min-w-0">
-                                          <span className="text-xs font-semibold text-foreground">
-                                            {formatMonthLabel(monthKey)}
-                                          </span>
-                                          <span className="text-[11px] text-muted-foreground truncate">
-                                            {formatAirportWithLabel(entry.origin)} {'>'}{' '}
-                                            {formatAirportWithLabel(entry.destination_code, entry.destination_label)}
-                                          </span>
-                                          <span className="text-[11px] text-muted-foreground">
-                                            {formatDateRange(entry.depart_date, entry.return_date)}
-                                          </span>
-                                          <span className="text-[11px] text-muted-foreground truncate">
-                                            {formatTimeRange(entry)} | {entry.outbound.airline} / {entry.inbound.airline}
+                      .filter((group) => groupDestFilters.length === 0 || groupDestFilters.includes(group.code))
+                      .map((group) => {
+                        const filteredItems = group.items.filter(
+                          ({ monthKey }) => monthFilters.length === 0 || monthFilters.includes(monthKey)
+                        )
+                        const sortedItems = sortEntries(
+                          filteredItems.map(i => i.entry),
+                          groupSortByPrice,
+                          groupSortByDate,
+                          groupSortDirection
+                        )
+
+                        return (
+                          <Card key={group.code} className="bg-background/40 flex flex-col">
+                            <CardHeader className="pb-2 pt-3 px-3">
+                              <CardTitle className="text-sm font-semibold text-foreground">
+                                {formatAirportWithLabel(group.code, group.label)}
+                              </CardTitle>
+                              <CardDescription className="text-[11px]">
+                                {filteredItems.length} meses disponibles
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-3 pb-3 flex-1">
+                              <ScrollArea className="h-[280px]">
+                                <div className="space-y-2 pr-3">
+                                  {sortedItems.map((entry, idx) => {
+                                    const monthKey = `${entry.year}-${String(entry.month).padStart(2, '0')}`
+                                    return (
+                                      <button
+                                        key={`${group.code}-${monthKey}-${entry.depart_date}-${entry.origin}-${idx}`}
+                                        type="button"
+                                        onClick={() => handleSelectEntry(entry)}
+                                        className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-all hover:border-primary/50 hover:bg-accent/50 hover:shadow-sm"
+                                      >
+                                        {/* Header row with month and price */}
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                          <Badge variant="secondary" className="text-[10px] font-medium">
+                                            {formatShortMonth(monthKey)} {entry.year}
+                                          </Badge>
+                                          <span className="text-sm font-bold text-primary">
+                                            {formatMoney(entry.total_price, entry.currency)}
                                           </span>
                                         </div>
-                                        <span className="text-xs font-semibold text-foreground shrink-0">
-                                          {formatMoney(entry.total_price, entry.currency)}
-                                        </span>
-                                      </div>
-                                    </button>
-                                  ))}
-                              </div>
-                            </ScrollArea>
-                          </CardContent>
-                        </Card>
-                      ))}
+                                        
+                                        {/* Main content - clear hierarchy */}
+                                        <div className="space-y-1.5">
+                                          {/* Dates - most prominent */}
+                                          <div className="flex items-center gap-2">
+                                            <CalendarDaysIcon className="text-primary shrink-0" size={12} />
+                                            <span className="text-xs font-semibold text-foreground">
+                                              {formatDateRange(entry.depart_date, entry.return_date)}
+                                            </span>
+                                          </div>
+                                          
+                                          {/* Route */}
+                                          <div className="flex items-center gap-2">
+                                            <MapPinIcon className="text-muted-foreground shrink-0" size={11} />
+                                            <span className="text-[11px] text-muted-foreground truncate">
+                                              {formatAirportWithLabel(entry.origin)} {'>'} {entry.destination_code}
+                                            </span>
+                                          </div>
+                                          
+                                          {/* Times and airlines */}
+                                          <div className="flex items-center gap-2">
+                                            <ClockIcon className="text-muted-foreground shrink-0" size={10} />
+                                            <span className="text-[10px] text-muted-foreground truncate">
+                                              {formatTimeRange(entry)}
+                                            </span>
+                                          </div>
+                                          
+                                          {/* Airlines as badges */}
+                                          <div className="flex items-center gap-1 pt-1">
+                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                                              {entry.outbound.airline}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                                              {entry.inbound.airline}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </ScrollArea>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            {/* Tab 3: Ranking */}
+            {/* Tab 3: Ranking - with multi-select */}
             <TabsContent value="ranking" className="space-y-4">
               <Card>
                 <CardHeader className="pb-3">
@@ -844,38 +907,26 @@ export default function AnnualPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Filters */}
+                  {/* Multi-select filters */}
                   {data.topGlobal.length > 0 && (
                     <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-border">
-                      <Select value={topDestFilter} onValueChange={setTopDestFilter}>
-                        <SelectTrigger className="w-[180px] h-9 text-xs">
-                          <MapPin className="size-3.5 mr-1.5 text-muted-foreground" />
-                          <SelectValue placeholder="Destino" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">Todos los destinos</SelectItem>
-                          {destOptions.map((opt) => (
-                            <SelectItem key={opt.code} value={opt.code}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <MultiSelect
+                        options={destOptions}
+                        selected={topDestFilters}
+                        onChange={setTopDestFilters}
+                        placeholder="Destinos"
+                        icon={<MapPin className="size-3.5 text-muted-foreground" />}
+                        className="w-[200px]"
+                      />
 
-                      <Select value={topOriginFilter} onValueChange={setTopOriginFilter}>
-                        <SelectTrigger className="w-[160px] h-9 text-xs">
-                          <Plane className="size-3.5 mr-1.5 text-muted-foreground" />
-                          <SelectValue placeholder="Origen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">Todos</SelectItem>
-                          {originOptions.map((opt) => (
-                            <SelectItem key={opt.code} value={opt.code}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <MultiSelect
+                        options={originOptions}
+                        selected={topOriginFilters}
+                        onChange={setTopOriginFilters}
+                        placeholder="Origenes"
+                        icon={<Plane className="size-3.5 text-muted-foreground" />}
+                        className="w-[180px]"
+                      />
 
                       <Separator orientation="vertical" className="h-6 hidden sm:block" />
 
@@ -884,9 +935,15 @@ export default function AnnualPage() {
                           Ordenar
                         </span>
                         <ToggleGroup
-                          type="single"
-                          value={topSortField}
-                          onValueChange={(v) => v && setTopSortField(v as 'price' | 'date')}
+                          type="multiple"
+                          value={[
+                            ...(topSortByPrice ? ['price'] : []),
+                            ...(topSortByDate ? ['date'] : []),
+                          ]}
+                          onValueChange={(values) => {
+                            setTopSortByPrice(values.includes('price'))
+                            setTopSortByDate(values.includes('date'))
+                          }}
                           className="h-8"
                         >
                           <ToggleGroupItem value="price" className="h-7 px-2.5 text-xs">
@@ -914,56 +971,65 @@ export default function AnnualPage() {
                     </div>
                   )}
 
-                  {/* Ranking list */}
+                  {/* Ranking list - improved cards */}
                   <div className="space-y-2">
-                    {data.topGlobal
-                      .filter(
+                    {sortEntries(
+                      data.topGlobal.filter(
                         (entry) =>
-                          (topDestFilter === 'ALL' || entry.destination_code === topDestFilter) &&
-                          (topOriginFilter === 'ALL' || entry.origin === topOriginFilter),
-                      )
-                      .slice()
-                      .sort((a, b) => {
-                        const direction = topSortDirection === 'asc' ? 1 : -1
-                        if (topSortField === 'price') {
-                          return (a.total_price - b.total_price) * direction
-                        }
-                        const aDate = new Date(a.depart_date).getTime()
-                        const bDate = new Date(b.depart_date).getTime()
-                        return (aDate - bDate) * direction
-                      })
-                      .map((entry, index) => (
-                        <button
-                          type="button"
-                          key={`${entry.destination_code}-${entry.depart_date}-${entry.origin}-${index}`}
-                          onClick={() => handleSelectEntry(entry)}
-                          className="flex w-full items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2.5 gap-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/50"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Badge
-                              variant={index < 3 ? 'default' : 'secondary'}
-                              className="w-8 justify-center text-[10px] font-semibold"
-                            >
-                              #{index + 1}
-                            </Badge>
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-semibold text-foreground">
-                                {formatAirportWithLabel(entry.origin)} {'>'}{' '}
-                                {formatAirportWithLabel(entry.destination_code, entry.destination_label)}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {formatDateRange(entry.depart_date, entry.return_date)}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {formatTimeRange(entry)} | {entry.outbound.airline} / {entry.inbound.airline}
-                              </span>
+                          (topDestFilters.length === 0 || topDestFilters.includes(entry.destination_code)) &&
+                          (topOriginFilters.length === 0 || topOriginFilters.includes(entry.origin)),
+                      ),
+                      topSortByPrice,
+                      topSortByDate,
+                      topSortDirection
+                    ).map((entry, index) => (
+                      <button
+                        type="button"
+                        key={`${entry.destination_code}-${entry.depart_date}-${entry.origin}-${index}`}
+                        onClick={() => handleSelectEntry(entry)}
+                        className="flex w-full items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-3 gap-3 text-left transition-all hover:border-primary/50 hover:bg-accent/50 hover:shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Badge
+                            variant={index < 3 ? 'default' : 'secondary'}
+                            className="w-9 justify-center text-[11px] font-bold"
+                          >
+                            #{index + 1}
+                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm font-semibold text-foreground">
+                              {formatAirportWithLabel(entry.origin)} {'>'}{' '}
+                              {formatAirportWithLabel(entry.destination_code, entry.destination_label)}
+                            </span>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <CalendarDaysIcon className="text-primary" size={11} />
+                                <span className="text-xs font-medium text-foreground">
+                                  {formatDateRange(entry.depart_date, entry.return_date)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <ClockIcon className="text-muted-foreground" size={10} />
+                                <span className="text-[11px] text-muted-foreground">
+                                  {formatTimeRange(entry)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                                {entry.outbound.airline}
+                              </Badge>
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                                {entry.inbound.airline}
+                              </Badge>
                             </div>
                           </div>
-                          <span className="text-sm font-semibold text-foreground">
-                            {formatMoney(entry.total_price, entry.currency)}
-                          </span>
-                        </button>
-                      ))}
+                        </div>
+                        <span className="text-base font-bold text-primary shrink-0">
+                          {formatMoney(entry.total_price, entry.currency)}
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
