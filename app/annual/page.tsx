@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Globe2, Trophy, Sparkles, ArrowUp, ArrowDown, MapPin, Plane, CalendarDays } from 'lucide-react'
 import { Header } from '@/components/header'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { CompactSearchForm } from '@/components/compact-search-form'
 import { FlightDetailsModal } from '@/components/flight-details-modal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -426,6 +427,13 @@ export default function AnnualPage() {
       <Header backLinkHref="/" backLabel="Volver" />
 
       <main className="container mx-auto px-4 py-8 md:py-10">
+        {/* Compact search form */}
+        <CompactSearchForm
+          initialOrigins={selectedOrigins.length > 0 ? selectedOrigins : ['AGP', 'SVQ']}
+          initialDestinations={selectedDestinations.length > 0 ? selectedDestinations : ['KRK', 'EDI', 'MXP', 'LIN', 'BGY']}
+          className="mb-6"
+        />
+
         {/* Page header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
