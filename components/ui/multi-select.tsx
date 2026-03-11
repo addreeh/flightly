@@ -10,7 +10,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export interface MultiSelectOption {
@@ -136,25 +135,34 @@ export function MultiSelect({
               options.map((option) => {
                 const isSelected = selected.includes(option.value)
                 return (
-                  <button
+                  <div
                     key={option.value}
-                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
                     onClick={() => handleToggle(option.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleToggle(option.value)
+                      }
+                    }}
+                    tabIndex={0}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none transition-colors',
-                      'hover:bg-accent hover:text-accent-foreground',
+                      'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none transition-colors cursor-pointer',
+                      'hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground',
                       isSelected && 'bg-accent/50',
                     )}
                   >
-                    <Checkbox
-                      checked={isSelected}
-                      className="size-3.5 pointer-events-none"
-                    />
+                    <div
+                      className={cn(
+                        'size-3.5 shrink-0 rounded-[4px] border border-input flex items-center justify-center',
+                        isSelected && 'bg-primary border-primary',
+                      )}
+                    >
+                      {isSelected && <Check className="size-2.5 text-primary-foreground" />}
+                    </div>
                     <span className="truncate">{option.label}</span>
-                    {isSelected && (
-                      <Check className="size-3 ml-auto text-primary shrink-0" />
-                    )}
-                  </button>
+                  </div>
                 )
               })
             )}
