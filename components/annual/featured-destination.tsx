@@ -57,38 +57,40 @@ export function FeaturedDestination({
       </CardHeader>
       
       <CardContent className="relative px-4 pb-4 pt-0">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2 text-[11px] text-muted-foreground flex-1">
-            {/* Date badge */}
-            <Badge variant="secondary" className="gap-1 bg-primary/5 text-primary text-[10px]">
-              <CalendarDaysIcon className="text-primary" size={10} />
-              {dateRange}
-            </Badge>
-            
-            <div className="flex items-center gap-2">
-              <MapPinIcon className="text-primary shrink-0" size={12} />
-              <span>
-                {originLabel} {'>'} {destinationLabel}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <ClockIcon className="text-muted-foreground shrink-0" size={10} />
-              <span>{timeRange}</span>
-            </div>
-            <div className="flex items-center gap-2 truncate">
-              <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
-                {'<'}
-              </span>
-              <span className="truncate">
-                {outboundAirline} / {inboundAirline}
-              </span>
-            </div>
+        {/* Route details */}
+        <div className="space-y-2 text-[11px] text-muted-foreground">
+          {/* Date badge */}
+          <Badge variant="secondary" className="gap-1 bg-primary/5 text-primary text-[10px]">
+            <CalendarDaysIcon className="text-primary" size={10} />
+            {dateRange}
+          </Badge>
+
+          <div className="flex items-start gap-2">
+            <MapPinIcon className="text-primary shrink-0 mt-px" size={12} />
+            <span className="break-words min-w-0">
+              {originLabel} ({originCode}) {'>'} {destinationLabel} ({destinationCode})
+            </span>
           </div>
-          
-          <div className="text-right">
-            <span className="block text-[11px] text-muted-foreground">desde</span>
-            <span className="text-lg font-semibold text-foreground">{price}</span>
+          <div className="flex items-center gap-2">
+            <ClockIcon className="text-muted-foreground shrink-0" size={10} />
+            <span className="truncate">{timeRange}</span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
+              A
+            </span>
+            <span className="truncate">
+              {outboundAirline} / {inboundAirline}
+            </span>
+          </div>
+        </div>
+
+        {/* Price row — full width, always visible, never clipped */}
+        <div className="mt-4 flex items-baseline justify-between border-t border-border/60 pt-3">
+          <span className="text-[11px] text-muted-foreground">desde</span>
+          <span className="text-2xl font-bold text-primary tabular-nums">
+            {price}
+          </span>
         </div>
       </CardContent>
     </Card>

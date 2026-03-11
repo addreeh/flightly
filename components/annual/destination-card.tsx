@@ -40,21 +40,24 @@ export function DestinationCard({
       onClick={onClick}
     >
       <CardHeader className="pb-2 pt-3 px-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-              {destinationCode}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-foreground">
-                {destinationLabel}
-              </span>
-              <Badge variant="secondary" className="w-fit text-[10px] px-1.5 py-0 h-4">
-                {month}
-              </Badge>
-            </div>
+        <div className="flex items-start gap-2">
+          {/* Icon */}
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+            {destinationCode}
           </div>
-          <span className="text-sm font-semibold text-foreground">{price}</span>
+          {/* Name + month — takes available space, clips if needed */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-xs font-semibold text-foreground leading-tight">
+              {destinationLabel} ({destinationCode})
+            </span>
+            <Badge variant="secondary" className="w-fit text-[10px] px-1.5 py-0 h-4 shrink-0">
+              {month}
+            </Badge>
+          </div>
+          {/* Price — never shrinks, always right-aligned */}
+          <span className="shrink-0 text-sm font-bold text-primary tabular-nums">
+            {price}
+          </span>
         </div>
       </CardHeader>
       <CardContent className="px-3 pb-3 pt-0">
